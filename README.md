@@ -2,6 +2,8 @@
 
 Build a **Dynamic Flip Screen** that allows users to crop video content dynamically. This involves integrating a video player, overlaying a cropper layer with multiple aspect ratios, and providing a dynamic preview of the cropped segment.
 
+Live: https://dynamic-flip-screen.netlify.app/
+
 
 ### Features:
 
@@ -42,3 +44,8 @@ Build a **Dynamic Flip Screen** that allows users to crop video content dynamica
     
     - **Download JSON:**  CTA to download this JSON data on clicking "Generate Preview".
     - **Negligible Delay:** Ensures no or negligible delay between the preview and the actual video for a seamless experience.
+
+![image](https://github.com/user-attachments/assets/5891b810-66fe-403e-b889-670d9dd38ecc)
+
+![image](https://github.com/user-attachments/assets/7353322e-fecb-4f34-9a87-c50831224c01)
+
