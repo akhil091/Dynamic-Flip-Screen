@@ -18,4 +18,4 @@ const PreviewBox = ({ isCropperActive, preview, aspectRatio }) => (
    </div>
 );
 
-export default PreviewBox;
+export default PreviewBox; 
