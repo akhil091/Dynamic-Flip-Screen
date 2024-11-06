@@ -1,21 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Draggable from 'react-draggable';
 
 import Dropdown from './custom-components/Dropdown';
-import Video from "../assets/video.mp4";
+import Video from "../assets/video  .mp4";
 
-const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, setPreview, setJsonData }) => {
-   const [videoState, setVideoState] = useState({
-      isPlaying: false,
-      volume: 1,
-      playbackSpeed: 1,
-      progress: 0,
-      duration: 0,
-      currentTime: 0,
-      cropBox: { width: 0, height: 0, top: 0, left: 0 }
-   });
+const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, setPreview, jsonData, setJsonData }) => {
    const videoRef = useRef(null);
-
+   const [isPlaying, setIsPlaying] = useState(false);
+   const [volume, setVolume] = useState(1);
+   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+   const [progress, setProgress] = useState(0);
+   const [duration, setDuration] = useState(0);
+   const [currentTime, setCurrentTime] = useState(0);
+   const [cropBox, setCropBox] = useState({ width: 0, height: 0, top: 0, left: 0 });
+   
    const playBackSpeedData = [
       { text: "0.25x", value: 0.25 },
       { text: "0.5x", value: 0.5 },
@@ -24,6 +22,7 @@ const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, se
       { text: "2x", value: 2 },
       { text: "3x", value: 3 }
    ];
+
    const aspectRatioData = [
       { text: "9:18", value: "9:18" },
       { text: "9:16", value: "9:16" },
@@ -32,7 +31,7 @@ const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, se
       { text: "1:1", value: "1:1" },
       { text: "4:5", value: "4:5" },
    ];
-   
+
    const formatTime = (time) => {
       const date = new Date(null);
       date.setSeconds(time);
@@ -40,151 +39,138 @@ const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, se
    };
 
    const handlePlayPause = () => {
-      videoRef.current[videoState.isPlaying ? 'pause' : 'play']();
-      setVideoState(prevState => ({...prevState, isPlaying: !prevState.isPlaying}));
+      videoRef.current[isPlaying ? 'pause' : 'play']();
+      setIsPlaying(prevState => !prevState);
    };
 
-   const handleMediaChange = (e, type) => {
-      const newValue = e.target.value;
-      setVideoState(prevState => ({
-         ...prevState,
-         [type]: newValue
-      }));
+   const handleVolumeChange = (e) => {
+      const newVolume = e.target.value;
+      videoRef.current.volume = newVolume;
+      setVolume(newVolume);
    };
 
-   const handleProgressAndTimeUpdate = () => {
+   const handlePlaybackSpeedChange = (e) => {
+      const newSpeed = e.target.value;
+      videoRef.current.playbackRate = newSpeed;
+      setPlaybackSpeed(newSpeed);
+   };
+
+   const handleProgress = () => {
       const video = videoRef.current;
-      setVideoState(prevState => ({
-         ...prevState,
-         currentTime: video.currentTime,
-         progress: (video.currentTime / video.duration) * 100
-      }));
+      const currentProgress = (video.currentTime / video.duration) * 100;
+      setProgress(currentProgress);
    };
 
    const handleTimelineChange = (e) => {
       const video = videoRef.current;
       const newTime = (e.target.value / 100) * video.duration;
       video.currentTime = newTime;
-      setVideoState(prevState => ({
-         ...prevState,
-         progress: e.target.value
+      setProgress(e.target.value);
+   };
+
+   const handleDrag = (e, data) => {
+      setCropBox((prevBox) => ({
+         ...prevBox,
+         left: Math.max(0, Math.min(data.x, videoRef.current.offsetWidth - prevBox.width)),
+         top: Math.max(0, Math.min(data.y, videoRef.current.offsetHeight - prevBox.height))
       }));
    };
 
-   useEffect(() => {
-      const video = videoRef.current;
-
-      const handleLoadedMetadata = () => {
-         setVideoState(prevState => ({
-            ...prevState,
-            duration: video.duration
-         }));
-      };
+   const setupVideoListeners = (video) => {
+      const handleLoadedMetadata = () => setDuration(video.duration);
+      const handleTimeUpdate = () => setCurrentTime(video.currentTime);
 
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
-      video.addEventListener('timeupdate', handleProgressAndTimeUpdate);
+      video.addEventListener('timeupdate', handleTimeUpdate);
 
       return () => {
          video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-         video.removeEventListener('timeupdate', handleProgressAndTimeUpdate);
+         video.removeEventListener('timeupdate', handleTimeUpdate);
       };
-   }, []);
+   };
 
-   const calculateCropBox = () => {
+   const calculateCropBox = useCallback(() => {
       if (!videoRef.current) return;
-      
+
       const videoWidth = videoRef.current.offsetWidth;
       const videoHeight = videoRef.current.offsetHeight;
       const [widthRatio, heightRatio] = aspectRatio.split(':').map(Number);
+
       const cropWidth = videoWidth;
       const cropHeight = Math.min((cropWidth / widthRatio) * heightRatio, videoHeight);
       const cropWidthAdjusted = cropHeight * widthRatio / heightRatio;
 
-      setVideoState(prevState => ({
-         ...prevState,
-         cropBox: {
-            width: cropWidthAdjusted,
-            height: cropHeight,
-            top: videoHeight - cropHeight,
-            left: 0,
-         }
-      }));
-   };
+      setCropBox({
+         width: cropWidthAdjusted,
+         height: cropHeight,
+         top: videoHeight - cropHeight,
+         left: 0,
+      });
+   }, [aspectRatio]);
+
+   useEffect(() => {
+      const video = videoRef.current;
+      const cleanupListeners = setupVideoListeners(video);
+      return cleanupListeners;
+   }, []);
+
    useEffect(() => {
       calculateCropBox();
-   }, [aspectRatio]);
+   }, [aspectRatio, calculateCropBox]);
 
    useEffect(() => {
       if (!isCropperActive) return;
 
       const generateLivePreview = () => {
+         if (!videoRef.current || videoRef.current.readyState < 2) return;
+
          const video = videoRef.current;
-         if (!video || video.readyState < 2) return;
-
-         const { width, height, left, top } = videoState.cropBox;
-         if (width <= 0 || height <= 0) {
-            console.error('Invalid cropBox dimensions:', videoState.cropBox);
-            return;
-         }
-
          const canvas = document.createElement('canvas');
          const context = canvas.getContext('2d');
-         canvas.width = width;
-         canvas.height = height;
+         canvas.width = cropBox.width;
+         canvas.height = cropBox.height;
 
+         if (cropBox.width <= 0 || cropBox.height <= 0) {
+            console.error('Invalid cropBox dimensions:', cropBox);
+            return;
+         }
          context.drawImage(
             video,
-            left * 1.5, top * 1.5, width * 1.5, height * 1.5,
-            0, 0, width, height
+            cropBox.left * 1.5, cropBox.top * 1.5, (cropBox.width * 1.5), (cropBox.height * 1.5),
+            0, 0, canvas.width, canvas.height
          );
          setPreview(canvas.toDataURL());
       };
 
       const interval = setInterval(generateLivePreview, 10);
       return () => clearInterval(interval);
-   }, [aspectRatio, videoState.cropBox, isCropperActive, setPreview]);
- 
-   const updateCropBox = (newDimensions) => {
-      setVideoState(prevState => ({
-         ...prevState,
-         cropBox: {
-            ...prevState.cropBox,
-            ...newDimensions,
-         }
-      }));
-   };
+   }, [aspectRatio, cropBox, isCropperActive, setPreview]);
 
-   const handleDrag = (e, data) => {
-      updateCropBox({
-         left: Math.max(0, Math.min(data.x, videoRef.current.offsetWidth - videoState.cropBox.width)),
-         top: Math.max(0, Math.min(data.y, videoRef.current.offsetHeight - videoState.cropBox.height))
-      });
-   };
+   
 
    useEffect(() => {
-      if (!videoState.isPlaying) return;
-
-      const interval = setInterval(() => {
-         setJsonData((prevData) => [
-            ...prevData,
-            {
-               timeStamp: videoRef.current.currentTime,
-               coordinates: [videoState.cropBox.left, videoState.cropBox.top, videoState.cropBox.width, videoState.cropBox.height],
-               volume: videoState.volume,
-               playbackSpeed: videoState.playbackSpeed,
-            },
-         ]);
-      }, 1000);
-
-      return () => clearInterval(interval);
-   }, [videoState.isPlaying, videoState.cropBox, videoState.volume, videoState.playbackSpeed]);
+      if (isPlaying) {
+         const interval = setInterval(() => {
+            setJsonData(prevData => [
+               ...prevData,
+               {
+                  timeStamp: videoRef.current.currentTime,
+                  coordinates: [cropBox.left, cropBox.top, cropBox.width, cropBox.height],
+                  volume,
+                  playbackSpeed,
+               },
+            ]);
+         }, 1000);
+         return () => clearInterval(interval);
+      }
+   }, [isPlaying, cropBox, volume, playbackSpeed, setJsonData ]);
 
    return (
       <div className="grid gap-2">
          <div className='relative aspect-video w-full'>
             <video
                ref={videoRef}
-               onTimeUpdate={handleProgressAndTimeUpdate}
+               onTimeUpdate={handleProgress}
                className="w-full h-full aspect-video"
                width="100%"
                src={Video}
@@ -195,8 +181,8 @@ const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, se
                      className="crop-overlay cursor-move border-white absolute border-x top-0 left-0"
                      style={{
                         aspectRatio: `${aspectRatio.replace(":", " / ")}`,
-                        width: videoState.cropBox.width,
-                        height: videoState.cropBox.height,
+                        width: cropBox.width,
+                        height: cropBox.height,
                      }}
                   >
                      <div className='absolute w-full h-[1px] border-b border-dashed border-white top-[33%]'></div>
@@ -210,45 +196,45 @@ const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, se
          <div className="controls flex flex-col">
             <div className='flex items-center gap-2'>
                <button onClick={handlePlayPause} className="text-2xl">
-                  {videoState.isPlaying ? <i className='bi bi-pause-fill'></i> : <i className='bi bi-play-fill'></i>}
+                  {isPlaying ? <i className='bi bi-pause-fill'></i> : <i className='bi bi-play-fill'></i>}
                </button>
                <input
                   type="range"
-                  value={videoState.progress}
+                  value={progress}
                   onChange={handleTimelineChange}
                   className="timeline w-full appearance-none h-1 bg-black bg-opacity-7 rounded-full"
                   min="0"
                   max="100"
                   style={{
-                     background: `linear-gradient(to right, white ${videoState.progress}%, rgba(255, 255, 255, 0.07) ${videoState.progress}%)`,
+                     background: `linear-gradient(to right, white ${progress}%, rgba(255, 255, 255, 0.07) ${progress}%)`,
                   }}
                />
             </div>
             <div className='flex justify-between items-center'>
                <div className="flex justify-center items-center gap-1 text-sm">
-                  <span>{formatTime(videoState.currentTime)}</span>
+                  <span>{formatTime(currentTime)}</span>
                   <span className='opacity-50'>|</span>
-                  <span className='opacity-50'>{formatTime(videoState.duration)}</span>
+                  <span className='opacity-50'>{formatTime(duration)}</span>
                </div>
                <div className="text-xl flex items-center gap-2">
-                  <i className={`bi ${videoState.volume * 100 >= 60 ? 'bi-volume-up-fill' : videoState.volume * 100 > 0 ? 'bi-volume-down-fill' : 'bi-volume-mute-fill'}`}></i>
+                  <i className={`bi ${volume * 100 >= 60 ? 'bi-volume-up-fill' : volume * 100 > 0 ? 'bi-volume-down-fill' : 'bi-volume-mute-fill'}`}></i>
                   <input
                      type="range"
-                     value={videoState.volume}
-                     onChange={(e) => handleMediaChange(e, 'volume')}
+                     value={volume}
+                     onChange={handleVolumeChange}
                      min="0"
                      max="1"
                      step="0.01"
                      className="timeline w-[60px] appearance-none h-[3px] bg-black bg-opacity-7 rounded-full"
                      style={{
-                        background: `linear-gradient(to right, white ${videoState.volume * 100}%, rgba(255, 255, 255, 0.07) ${videoState.volume * 100}%)`,
+                        background: `linear-gradient(to right, white ${volume * 100}%, rgba(255, 255, 255, 0.07) ${volume * 100}%)`,
                      }}
                   />
                </div>
             </div>
             <div className='flex justify-start items-center gap-2 mt-2'>
-               <Dropdown data={playBackSpeedData} defaultValue={videoState.playbackSpeed} onChangeHandle={(e) => handleMediaChange(e, 'playbackSpeed')} />
-               <Dropdown data={aspectRatioData} defaultValue={aspectRatio} onChangeHandle={handleAspectRatioChange} />
+               <Dropdown data={playBackSpeedData} defaultValue={playbackSpeed} optionLabel={"Playback Speed"} onChangeHandle={handlePlaybackSpeedChange} />
+               <Dropdown data={aspectRatioData} defaultValue={aspectRatio} optionLabel={"Cropper Aspect Ratio"} onChangeHandle={handleAspectRatioChange} />
             </div>
          </div>
       </div>
