@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Draggable from 'react-draggable';
 
 import Dropdown from './custom-components/Dropdown';
-import Video from "../assets/video  .mp4";
+import Video from "../video.mp4";
 
 const VideoPlayer = ({ aspectRatio, handleAspectRatioChange, isCropperActive, setPreview, jsonData, setJsonData }) => {
    const videoRef = useRef(null);
